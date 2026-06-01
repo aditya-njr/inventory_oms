@@ -1,0 +1,25 @@
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+frontend/node_modules/
+backend/.venv/
+backend/venv/
+
+# Build outputs
+frontend/build/
+frontend/dist/
+__pycache__/
+*.py[cod]
+
+# IDE / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# Git
+.git/

@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: inventory-oms-backend
+    runtime: docker
+    plan: free
+    dockerImage: YOUR_DOCKERHUB_USERNAME/inventory-oms-backend:latest
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: inventory-oms-db
+          property: connectionString
+      - key: FRONTEND_ORIGIN
+        sync: false
+      - key: LOW_STOCK_THRESHOLD
+        value: "10"
+
+databases:
+  - name: inventory-oms-db
+    plan: free
+    databaseName: inventory_db
+    user: inventory_user
