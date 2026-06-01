@@ -1,28 +1,70 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { customersApi } from '../api/client';
-import DataTable from '../components/DataTable';
-import FormField from '../components/FormField';
-import Modal from '../components/Modal';
-import { useToast } from '../components/Toast';
+import React, { useCallback, useEffect, useState } from "react";
+import { customersApi } from "../api/client";
+import DataTable from "../components/DataTable";
+import FormField from "../components/FormField";
+import Modal from "../components/Modal";
+import { useToast } from "../components/Toast";
 
 const emptyForm = {
-  full_name: '',
-  email: '',
-  phone: '',
+  full_name: "",
+  email: "",
+  phone: "",
 };
 
 function validateCustomerForm(form) {
   const errors = {};
-  if (!form.full_name.trim()) errors.full_name = 'Full name is required';
-  if (!form.email.trim()) {
-    errors.email = 'Email is required';
-  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-    errors.email = 'Enter a valid email address';
+  const fullName = form.full_name.trim();
+  const email = form.email.trim();
+  const phone = form.phone.trim();
+  const namePattern = /^[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ .'-]{1,}$/;
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const phoneDigits = phone.replace(/\D/g, "");
+
+  if (!fullName) {
+    errors.full_name = "Full name is required";
+  } else if (!namePattern.test(fullName)) {
+    errors.full_name = "Enter a valid full name";
   }
-  if (!form.phone.trim() || form.phone.trim().length < 5) {
-    errors.phone = 'Phone number must be at least 5 characters';
+
+  if (!email) {
+    errors.email = "Email is required";
+  } else if (!emailPattern.test(email)) {
+    errors.email = "Enter a valid email address";
   }
+
+  if (!phone) {
+    errors.phone = "Phone number is required";
+  } else if (phoneDigits.length !== 10 || !/^[6789]/.test(phoneDigits)) {
+    errors.phone = "Please enter valid phone number";
+  }
+
   return errors;
+}
+
+function validateCustomerField(name, value) {
+  const trimmed = value.trim();
+  const namePattern = /^[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ .'-]{1,}$/;
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const digits = trimmed.replace(/\D/g, "");
+
+  switch (name) {
+    case "full_name":
+      if (!trimmed) return "Full name is required";
+      if (!namePattern.test(trimmed)) return "Enter a valid full name";
+      return undefined;
+    case "email":
+      if (!trimmed) return "Email is required";
+      if (!emailPattern.test(trimmed)) return "Enter a valid email address";
+      return undefined;
+    case "phone":
+      if (!trimmed) return "Phone number is required";
+      if (digits.length !== 10 || !/^[6789]/.test(digits)) {
+        return "Please enter valid phone number";
+      }
+      return undefined;
+    default:
+      return undefined;
+  }
 }
 
 function Customers() {
@@ -40,7 +82,7 @@ function Customers() {
       const { data } = await customersApi.list();
       setCustomers(data);
     } catch (error) {
-      showToast(error.message, 'error');
+      showToast(error.message, "error");
     } finally {
       setLoading(false);
     }
@@ -64,8 +106,13 @@ function Customers() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-    setErrors((prev) => ({ ...prev, [name]: undefined }));
+    const nextValue =
+      name === "phone" ? value.replace(/\D/g, "").slice(0, 10) : value;
+
+    setForm((prev) => ({ ...prev, [name]: nextValue }));
+
+    const fieldError = validateCustomerField(name, nextValue);
+    setErrors((prev) => ({ ...prev, [name]: fieldError }));
   };
 
   const handleSubmit = async (e) => {
@@ -83,11 +130,11 @@ function Customers() {
         email: form.email.trim(),
         phone: form.phone.trim(),
       });
-      showToast('Customer created successfully');
+      showToast("Customer created successfully");
       closeModal();
       loadCustomers();
     } catch (error) {
-      showToast(error.message, 'error');
+      showToast(error.message, "error");
     } finally {
       setSubmitting(false);
     }
@@ -97,22 +144,26 @@ function Customers() {
     if (!window.confirm(`Delete customer "${customer.full_name}"?`)) return;
     try {
       await customersApi.delete(customer.id);
-      showToast('Customer deleted successfully');
+      showToast("Customer deleted successfully");
       loadCustomers();
     } catch (error) {
-      showToast(error.message, 'error');
+      showToast(error.message, "error");
     }
   };
 
   const columns = [
-    { key: 'full_name', label: 'Name' },
-    { key: 'email', label: 'Email' },
-    { key: 'phone', label: 'Phone' },
+    { key: "full_name", label: "Name" },
+    { key: "email", label: "Email" },
+    { key: "phone", label: "Phone" },
     {
-      key: 'actions',
-      label: 'Actions',
+      key: "actions",
+      label: "Actions",
       render: (row) => (
-        <button type="button" className="btn btn-sm btn-danger" onClick={() => handleDelete(row)}>
+        <button
+          type="button"
+          className="btn btn-sm btn-danger"
+          onClick={() => handleDelete(row)}
+        >
           Delete
         </button>
       ),
@@ -126,7 +177,11 @@ function Customers() {
           <h1>Customers</h1>
           <p className="page-subtitle">Manage customer records</p>
         </div>
-        <button type="button" className="btn btn-primary" onClick={openCreateModal}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={openCreateModal}
+        >
           Add Customer
         </button>
       </div>
@@ -135,7 +190,11 @@ function Customers() {
         {loading ? (
           <div className="page-loading">Loading customers...</div>
         ) : (
-          <DataTable columns={columns} data={customers} emptyMessage="No customers yet. Add your first customer." />
+          <DataTable
+            columns={columns}
+            data={customers}
+            emptyMessage="No customers yet. Add your first customer."
+          />
         )}
       </section>
 
@@ -163,18 +222,28 @@ function Customers() {
           <FormField
             label="Phone"
             name="phone"
+            type="tel"
             value={form.phone}
             onChange={handleChange}
             error={errors.phone}
             required
-            placeholder="+1-555-0100"
+            placeholder="9876543210"
+            maxLength={10}
           />
           <div className="form-actions">
-            <button type="button" className="btn btn-secondary" onClick={closeModal}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={closeModal}
+            >
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary" disabled={submitting}>
-              {submitting ? 'Saving...' : 'Create'}
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={submitting}
+            >
+              {submitting ? "Saving..." : "Create"}
             </button>
           </div>
         </form>

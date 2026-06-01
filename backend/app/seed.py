@@ -12,20 +12,20 @@ def seed_demo_data():
 
         products = [
             Product(name="Wireless Mouse", sku="WM-001", price=2499.00, quantity_in_stock=50),
-            Product(name="Mechanical Keyboard", sku="KB-002", price=7499.00, quantity_in_stock=8),
-            Product(name="USB-C Hub", sku="HUB-003", price=3750.00, quantity_in_stock=25),
-            Product(name="Monitor Stand", sku="MS-004", price=2950.00, quantity_in_stock=5),
+            Product(name="Mechanical Keyboard", sku="KB-002", price=7499.00, quantity_in_stock=2),
+            Product(name="USB-C Hub", sku="HUB-003", price=3750.00, quantity_in_stock=10),
+            Product(name="Monitor Stand", sku="MS-004", price=2950.00, quantity_in_stock=4),
         ]
         customers = [
             Customer(
                 full_name="Jane Doe",
                 email="jane.doe@example.com",
-                phone="+1-555-0101",
+                phone="6785550101",
             ),
             Customer(
                 full_name="John Smith",
                 email="john.smith@example.com",
-                phone="+1-555-0102",
+                phone="9785547511",
             ),
         ]
         db.add_all(products + customers)
