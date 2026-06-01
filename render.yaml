@@ -1,7 +1,7 @@
 services:
   - type: web
     name: inventory-oms-backend
-    runtime: docker
+    runtime: image
     plan: free
     dockerImage: adityanjr/inventory-oms-backend:latest
     healthCheckPath: /health
