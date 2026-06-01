@@ -11,10 +11,10 @@ def seed_demo_data():
             return
 
         products = [
-            Product(name="Wireless Mouse", sku="WM-001", price=29.99, quantity_in_stock=50),
-            Product(name="Mechanical Keyboard", sku="KB-002", price=89.99, quantity_in_stock=8),
-            Product(name="USB-C Hub", sku="HUB-003", price=45.00, quantity_in_stock=25),
-            Product(name="Monitor Stand", sku="MS-004", price=35.50, quantity_in_stock=5),
+            Product(name="Wireless Mouse", sku="WM-001", price=2499.00, quantity_in_stock=50),
+            Product(name="Mechanical Keyboard", sku="KB-002", price=7499.00, quantity_in_stock=8),
+            Product(name="USB-C Hub", sku="HUB-003", price=3750.00, quantity_in_stock=25),
+            Product(name="Monitor Stand", sku="MS-004", price=2950.00, quantity_in_stock=5),
         ]
         customers = [
             Customer(

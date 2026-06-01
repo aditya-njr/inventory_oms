@@ -10,7 +10,9 @@ function FormField({
   required = false,
   placeholder,
   min,
+  max,
   step,
+  disabled = false,
   as = 'input',
   options = [],
 }) {
@@ -25,7 +27,7 @@ function FormField({
       {as === 'select' ? (
         <select id={inputId} name={name} value={value} onChange={onChange} required={required}>
           {options.map((opt) => (
-            <option key={opt.value} value={opt.value}>
+            <option key={opt.value} value={opt.value} disabled={opt.disabled}>
               {opt.label}
             </option>
           ))}
@@ -40,7 +42,9 @@ function FormField({
           required={required}
           placeholder={placeholder}
           min={min}
+          max={max}
           step={step}
+          disabled={disabled}
         />
       )}
       {error && <span className="field-error">{error}</span>}

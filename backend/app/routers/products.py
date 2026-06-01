@@ -3,7 +3,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Product
+from app.models import OrderItem, Product
 from app.schemas import MessageResponse, ProductCreate, ProductResponse, ProductUpdate
 
 router = APIRouter(prefix="/products", tags=["products"])
@@ -53,8 +53,21 @@ def update_product(
         )
 
     update_data = product_update.model_dump(exclude_unset=True)
+
+    if "quantity_in_stock" in update_data and update_data["quantity_in_stock"] < 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Product quantity cannot be negative",
+        )
+
     for field, value in update_data.items():
         setattr(product, field, value)
+
+    if product.quantity_in_stock < 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Product quantity cannot be negative",
+        )
 
     try:
         db.commit()
@@ -77,6 +90,16 @@ def delete_product(product_id: int, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Product with id {product_id} not found",
         )
+
+    in_orders = (
+        db.query(OrderItem).filter(OrderItem.product_id == product_id).first()
+    )
+    if in_orders:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete product that exists in orders",
+        )
+
     db.delete(product)
     db.commit()
     return MessageResponse(message=f"Product {product_id} deleted successfully")

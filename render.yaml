@@ -13,7 +13,7 @@ services:
       - key: FRONTEND_ORIGIN
         sync: false
       - key: LOW_STOCK_THRESHOLD
-        value: "10"
+        value: "5"
 
 databases:
   - name: inventory-oms-db

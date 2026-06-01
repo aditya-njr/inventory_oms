@@ -4,6 +4,8 @@ import DataTable from '../components/DataTable';
 import FormField from '../components/FormField';
 import Modal from '../components/Modal';
 import { useToast } from '../components/Toast';
+import { formatINR } from '../utils/currency';
+import { formatDate } from '../utils/date';
 
 const emptyLineItem = { product_id: '', quantity: '1' };
 
@@ -39,11 +41,66 @@ function Orders() {
     }
   }, [showToast]);
 
+  const refreshProducts = useCallback(async () => {
+    try {
+      const { data } = await productsApi.list();
+      setProducts(data);
+      return data;
+    } catch (error) {
+      showToast(error.message, 'error');
+      return products;
+    }
+  }, [products, showToast]);
+
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  const openCreateModal = () => {
+  const inStockProducts = products.filter((p) => p.quantity_in_stock > 0);
+
+  const getSelectedProductIds = (excludeIndex = -1) =>
+    lineItems
+      .filter((_, i) => i !== excludeIndex)
+      .map((item) => item.product_id)
+      .filter(Boolean);
+
+  const getProductOptionsForRow = (rowIndex) => {
+    const selectedElsewhere = getSelectedProductIds(rowIndex);
+    const options = [{ value: '', label: 'Select product' }];
+
+    products.forEach((p) => {
+      const isSelectedElsewhere = selectedElsewhere.includes(String(p.id));
+      const isOutOfStock = p.quantity_in_stock <= 0;
+
+      if (isSelectedElsewhere) return;
+
+      options.push({
+        value: String(p.id),
+        label: isOutOfStock ? `${p.name} (${p.sku}) — Out of stock` : `${p.name} (${p.sku})`,
+        disabled: isOutOfStock,
+      });
+    });
+
+    return options;
+  };
+
+  const getProductById = (productId) =>
+    products.find((p) => p.id === Number(productId));
+
+  const getMaxQuantity = (productId) => {
+    const product = getProductById(productId);
+    return product ? product.quantity_in_stock : 0;
+  };
+
+  const openCreateModal = async () => {
+    const latestProducts = await refreshProducts();
+    const available = latestProducts.filter((p) => p.quantity_in_stock > 0);
+
+    if (available.length === 0) {
+      showToast('No products with available stock to order', 'error');
+      return;
+    }
+
     setCustomerId(customers[0]?.id ? String(customers[0].id) : '');
     setLineItems([{ ...emptyLineItem }]);
     setErrors({});
@@ -74,12 +131,42 @@ function Orders() {
 
   const handleLineItemChange = (index, field, value) => {
     setLineItems((prev) =>
-      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
+      prev.map((item, i) => {
+        if (i !== index) return item;
+
+        if (field === 'product_id') {
+          const product = getProductById(value);
+          if (product && product.quantity_in_stock <= 0) {
+            return item;
+          }
+          const maxQty = product ? product.quantity_in_stock : 1;
+          const currentQty = Number(item.quantity) || 1;
+          return {
+            ...item,
+            product_id: value,
+            quantity: String(Math.min(Math.max(currentQty, 1), maxQty)),
+          };
+        }
+
+        if (field === 'quantity') {
+          const maxQty = getMaxQuantity(item.product_id);
+          const parsed = value === '' ? '' : String(Math.max(1, Math.min(Number(value), maxQty || 1)));
+          return { ...item, quantity: parsed };
+        }
+
+        return { ...item, [field]: value };
+      })
     );
-    setErrors((prev) => ({ ...prev, items: undefined }));
+    setErrors((prev) => ({ ...prev, items: undefined, [`quantity_${index}`]: undefined }));
   };
 
   const addLineItem = () => {
+    const selectedIds = getSelectedProductIds();
+    const remaining = inStockProducts.filter((p) => !selectedIds.includes(String(p.id)));
+    if (remaining.length === 0) {
+      showToast('All available products have already been added', 'error');
+      return;
+    }
     setLineItems((prev) => [...prev, { ...emptyLineItem }]);
   };
 
@@ -98,12 +185,19 @@ function Orders() {
     } else {
       const productIds = validItems.map((item) => item.product_id);
       if (new Set(productIds).size !== productIds.length) {
-        newErrors.items = 'Duplicate products are not allowed';
+        newErrors.items = 'Each product can only be added once per order';
       }
+
       validItems.forEach((item, index) => {
-        const product = products.find((p) => p.id === Number(item.product_id));
-        if (product && product.quantity_in_stock < Number(item.quantity)) {
-          newErrors.items = `Insufficient stock for ${product.name}`;
+        const product = getProductById(item.product_id);
+        if (!product) {
+          newErrors.items = 'One or more selected products are invalid';
+          return;
+        }
+        if (product.quantity_in_stock <= 0) {
+          newErrors.items = `${product.name} is out of stock`;
+        } else if (product.quantity_in_stock < Number(item.quantity)) {
+          newErrors.items = `Insufficient stock for ${product.name}. Available: ${product.quantity_in_stock}`;
         }
         if (Number(item.quantity) <= 0) {
           newErrors[`quantity_${index}`] = 'Quantity must be greater than 0';
@@ -119,14 +213,38 @@ function Orders() {
     e.preventDefault();
     if (!validateOrderForm()) return;
 
+    const latestProducts = await refreshProducts();
+    const productMap = new Map(latestProducts.map((p) => [p.id, p]));
+
+    const payloadItems = lineItems
+      .filter((item) => item.product_id && Number(item.quantity) > 0)
+      .map((item) => ({
+        product_id: Number(item.product_id),
+        quantity: Number(item.quantity),
+      }));
+
+    for (const item of payloadItems) {
+      const product = productMap.get(item.product_id);
+      if (!product) {
+        showToast('One or more selected products are no longer available', 'error');
+        return;
+      }
+      if (product.quantity_in_stock <= 0) {
+        showToast(`${product.name} is out of stock`, 'error');
+        return;
+      }
+      if (product.quantity_in_stock < item.quantity) {
+        showToast(
+          `Insufficient stock for ${product.name}. Available: ${product.quantity_in_stock}`,
+          'error'
+        );
+        return;
+      }
+    }
+
     const payload = {
       customer_id: Number(customerId),
-      items: lineItems
-        .filter((item) => item.product_id && Number(item.quantity) > 0)
-        .map((item) => ({
-          product_id: Number(item.product_id),
-          quantity: Number(item.quantity),
-        })),
+      items: payloadItems,
     };
 
     setSubmitting(true);
@@ -137,6 +255,7 @@ function Orders() {
       loadData();
     } catch (error) {
       showToast(error.message, 'error');
+      refreshProducts();
     } finally {
       setSubmitting(false);
     }
@@ -153,17 +272,8 @@ function Orders() {
     }
   };
 
-  const formatDate = (dateStr) => {
-    return new Date(dateStr).toLocaleString();
-  };
-
-  const productOptions = [
-    { value: '', label: 'Select product' },
-    ...products.map((p) => ({
-      value: String(p.id),
-      label: `${p.name} (${p.sku}) - Stock: ${p.quantity_in_stock} - $${p.price.toFixed(2)}`,
-    })),
-  ];
+  const selectedCount = getSelectedProductIds().length;
+  const canAddMoreItems = selectedCount < inStockProducts.length;
 
   const customerOptions = [
     { value: '', label: 'Select customer' },
@@ -183,7 +293,7 @@ function Orders() {
     {
       key: 'total_amount',
       label: 'Total',
-      render: (row) => `$${Number(row.total_amount).toFixed(2)}`,
+      render: (row) => formatINR(row.total_amount),
     },
     {
       key: 'created_at',
@@ -218,12 +328,12 @@ function Orders() {
     {
       key: 'unit_price',
       label: 'Unit Price',
-      render: (row) => `$${Number(row.unit_price).toFixed(2)}`,
+      render: (row) => formatINR(row.unit_price),
     },
     {
       key: 'line_total',
       label: 'Line Total',
-      render: (row) => `$${(row.quantity * row.unit_price).toFixed(2)}`,
+      render: (row) => formatINR(row.quantity * row.unit_price),
     },
   ];
 
@@ -238,16 +348,17 @@ function Orders() {
           type="button"
           className="btn btn-primary"
           onClick={openCreateModal}
-          disabled={customers.length === 0 || products.length === 0}
+          disabled={customers.length === 0 || inStockProducts.length === 0}
         >
           Create Order
         </button>
       </div>
 
-      {(customers.length === 0 || products.length === 0) && (
-        <div className="alert alert-info">
-          Add at least one customer and one product before creating orders.
-        </div>
+      {customers.length === 0 && (
+        <div className="alert alert-info">Add at least one customer before creating orders.</div>
+      )}
+      {customers.length > 0 && inStockProducts.length === 0 && (
+        <div className="alert alert-info">No products with available stock. Restock products to create orders.</div>
       )}
 
       <section className="card">
@@ -258,7 +369,7 @@ function Orders() {
         )}
       </section>
 
-      <Modal isOpen={createModalOpen} title="Create Order" onClose={closeCreateModal} size="lg">
+      <Modal isOpen={createModalOpen} title="Create Order" onClose={closeCreateModal} size="xl">
         <form onSubmit={handleCreateOrder} className="form">
           <FormField
             label="Customer"
@@ -277,43 +388,66 @@ function Orders() {
           <div className="line-items-section">
             <div className="line-items-header">
               <h3>Order Items</h3>
-              <button type="button" className="btn btn-sm btn-secondary" onClick={addLineItem}>
+              <button
+                type="button"
+                className="btn btn-sm btn-secondary"
+                onClick={addLineItem}
+                disabled={!canAddMoreItems}
+              >
                 + Add Item
               </button>
             </div>
             {errors.items && <span className="field-error block-error">{errors.items}</span>}
 
-            {lineItems.map((item, index) => (
-              <div key={index} className="line-item-row">
-                <FormField
-                  label={`Product ${index + 1}`}
-                  name={`product_${index}`}
-                  as="select"
-                  value={item.product_id}
-                  onChange={(e) => handleLineItemChange(index, 'product_id', e.target.value)}
-                  options={productOptions}
-                />
-                <FormField
-                  label="Quantity"
-                  name={`quantity_${index}`}
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={item.quantity}
-                  onChange={(e) => handleLineItemChange(index, 'quantity', e.target.value)}
-                  error={errors[`quantity_${index}`]}
-                />
-                {lineItems.length > 1 && (
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-danger line-item-remove"
-                    onClick={() => removeLineItem(index)}
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-            ))}
+            {lineItems.map((item, index) => {
+              const maxQty = getMaxQuantity(item.product_id);
+              const selectedProduct = getProductById(item.product_id);
+              return (
+                <div key={index} className="line-item-row">
+                  <div className="line-item-header">
+                    <span>Item {index + 1}</span>
+                    {lineItems.length > 1 && (
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-danger"
+                        onClick={() => removeLineItem(index)}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  <FormField
+                    label="Product"
+                    name={`product_${index}`}
+                    as="select"
+                    value={item.product_id}
+                    onChange={(e) => handleLineItemChange(index, 'product_id', e.target.value)}
+                    options={getProductOptionsForRow(index)}
+                    required
+                  />
+                  {selectedProduct && (
+                    <p className="line-item-meta">
+                      Stock: {selectedProduct.quantity_in_stock} · Price: {formatINR(selectedProduct.price)}
+                    </p>
+                  )}
+                  <div className="line-item-controls">
+                    <FormField
+                      label={item.product_id ? `Quantity (max ${maxQty})` : 'Quantity'}
+                      name={`quantity_${index}`}
+                      type="number"
+                      min="1"
+                      max={maxQty || undefined}
+                      step="1"
+                      value={item.quantity}
+                      onChange={(e) => handleLineItemChange(index, 'quantity', e.target.value)}
+                      error={errors[`quantity_${index}`]}
+                      required
+                      disabled={!item.product_id}
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           <div className="form-actions">
@@ -333,7 +467,7 @@ function Orders() {
             <div className="order-detail-meta">
               <p><strong>Customer:</strong> {selectedOrder.customer_name}</p>
               <p><strong>Date:</strong> {formatDate(selectedOrder.created_at)}</p>
-              <p><strong>Total:</strong> ${Number(selectedOrder.total_amount).toFixed(2)}</p>
+              <p><strong>Total:</strong> {formatINR(selectedOrder.total_amount)}</p>
             </div>
             <DataTable columns={detailColumns} data={selectedOrder.items} />
           </div>

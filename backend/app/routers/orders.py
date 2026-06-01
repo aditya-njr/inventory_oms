@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 
@@ -29,6 +31,13 @@ def _serialize_order(order: Order) -> OrderResponse:
     )
 
 
+def _aggregate_item_quantities(order_data: OrderCreate) -> dict[int, int]:
+    quantities: dict[int, int] = defaultdict(int)
+    for item in order_data.items:
+        quantities[item.product_id] += item.quantity
+    return dict(quantities)
+
+
 @router.post("", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
 def create_order(order_data: OrderCreate, db: Session = Depends(get_db)):
     customer = db.query(Customer).filter(Customer.id == order_data.customer_id).first()
@@ -38,49 +47,73 @@ def create_order(order_data: OrderCreate, db: Session = Depends(get_db)):
             detail=f"Customer with id {order_data.customer_id} not found",
         )
 
+    aggregated = _aggregate_item_quantities(order_data)
     products_by_id: dict[int, Product] = {}
-    for item in order_data.items:
-        if item.product_id in products_by_id:
-            continue
-        product = db.query(Product).filter(Product.id == item.product_id).first()
-        if not product:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Product with id {item.product_id} not found",
-            )
-        if product.quantity_in_stock < item.quantity:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=(
-                    f"Insufficient stock for product '{product.name}' (SKU: {product.sku}). "
-                    f"Available: {product.quantity_in_stock}, requested: {item.quantity}"
-                ),
-            )
-        products_by_id[item.product_id] = product
 
-    total_amount = 0.0
-    order_items: list[OrderItem] = []
-    for item in order_data.items:
-        product = products_by_id[item.product_id]
-        line_total = product.price * item.quantity
-        total_amount += line_total
-        order_items.append(
-            OrderItem(
-                product_id=product.id,
-                quantity=item.quantity,
-                unit_price=product.price,
+    try:
+        for product_id, total_quantity in aggregated.items():
+            product = (
+                db.query(Product)
+                .filter(Product.id == product_id)
+                .with_for_update()
+                .first()
             )
+            if not product:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Product with id {product_id} not found",
+                )
+            if product.quantity_in_stock <= 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        f"Product '{product.name}' (SKU: {product.sku}) is out of stock"
+                    ),
+                )
+            if product.quantity_in_stock < total_quantity:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        f"Insufficient stock for product '{product.name}' (SKU: {product.sku}). "
+                        f"Available: {product.quantity_in_stock}, requested: {total_quantity}"
+                    ),
+                )
+            products_by_id[product_id] = product
+
+        total_amount = 0.0
+        order_items: list[OrderItem] = []
+        for item in order_data.items:
+            product = products_by_id[item.product_id]
+            line_total = product.price * item.quantity
+            total_amount += line_total
+            order_items.append(
+                OrderItem(
+                    product_id=product.id,
+                    quantity=item.quantity,
+                    unit_price=product.price,
+                )
+            )
+
+        for product_id, total_quantity in aggregated.items():
+            products_by_id[product_id].quantity_in_stock -= total_quantity
+
+        order = Order(
+            customer_id=customer.id,
+            total_amount=total_amount,
+            items=order_items,
         )
-        product.quantity_in_stock -= item.quantity
-
-    order = Order(
-        customer_id=customer.id,
-        total_amount=total_amount,
-        items=order_items,
-    )
-    db.add(order)
-    db.commit()
-    db.refresh(order)
+        db.add(order)
+        db.commit()
+        db.refresh(order)
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create order. Please try again.",
+        )
 
     order = (
         db.query(Order)
@@ -141,11 +174,24 @@ def delete_order(order_id: int, db: Session = Depends(get_db)):
             detail=f"Order with id {order_id} not found",
         )
 
-    for item in order.items:
-        product = db.query(Product).filter(Product.id == item.product_id).first()
-        if product:
-            product.quantity_in_stock += item.quantity
+    try:
+        for item in order.items:
+            product = (
+                db.query(Product)
+                .filter(Product.id == item.product_id)
+                .with_for_update()
+                .first()
+            )
+            if product:
+                product.quantity_in_stock += item.quantity
 
-    db.delete(order)
-    db.commit()
+        db.delete(order)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to cancel order. Please try again.",
+        )
+
     return MessageResponse(message=f"Order {order_id} cancelled successfully")

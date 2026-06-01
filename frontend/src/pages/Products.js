@@ -4,6 +4,7 @@ import DataTable from '../components/DataTable';
 import FormField from '../components/FormField';
 import Modal from '../components/Modal';
 import { useToast } from '../components/Toast';
+import { formatINR } from '../utils/currency';
 
 const emptyForm = {
   name: '',
@@ -19,6 +20,8 @@ function validateProductForm(form) {
   if (!form.price || Number(form.price) <= 0) errors.price = 'Price must be greater than 0';
   if (form.quantity_in_stock === '' || Number(form.quantity_in_stock) < 0) {
     errors.quantity_in_stock = 'Quantity cannot be negative';
+  } else if (!Number.isInteger(Number(form.quantity_in_stock))) {
+    errors.quantity_in_stock = 'Quantity must be a whole number';
   }
   return errors;
 }
@@ -130,8 +133,8 @@ function Products() {
     { key: 'sku', label: 'SKU' },
     {
       key: 'price',
-      label: 'Price',
-      render: (row) => `$${Number(row.price).toFixed(2)}`,
+      label: 'Price (INR)',
+      render: (row) => formatINR(row.price),
     },
     {
       key: 'quantity_in_stock',
@@ -203,7 +206,7 @@ function Products() {
             placeholder="e.g. WM-001"
           />
           <FormField
-            label="Price"
+            label="Price (INR)"
             name="price"
             type="number"
             min="0.01"
@@ -212,7 +215,7 @@ function Products() {
             onChange={handleChange}
             error={errors.price}
             required
-            placeholder="0.00"
+            placeholder="999.00"
           />
           <FormField
             label="Quantity in Stock"

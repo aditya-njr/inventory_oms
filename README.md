@@ -46,11 +46,11 @@ docker compose up --build
 
 ### 3. Access the application
 
-| Service  | URL                          |
-|----------|------------------------------|
-| Frontend | http://localhost:3000        |
-| Backend  | http://localhost:8000        |
-| API Docs | http://localhost:8000/docs   |
+| Service  | URL                        |
+| -------- | -------------------------- |
+| Frontend | http://localhost:3000      |
+| Backend  | http://localhost:8000      |
+| API Docs | http://localhost:8000/docs |
 
 ### 4. (Optional) Seed demo data
 
@@ -61,39 +61,44 @@ docker compose exec backend python -m app.seed
 ## API Endpoints
 
 ### Products
-| Method | Endpoint           | Description        |
-|--------|--------------------|--------------------|
-| POST   | `/products`        | Create product     |
-| GET    | `/products`        | List all products  |
-| GET    | `/products/{id}`   | Get product by ID  |
-| PUT    | `/products/{id}`   | Update product     |
-| DELETE | `/products/{id}`   | Delete product     |
+
+| Method | Endpoint         | Description       |
+| ------ | ---------------- | ----------------- |
+| POST   | `/products`      | Create product    |
+| GET    | `/products`      | List all products |
+| GET    | `/products/{id}` | Get product by ID |
+| PUT    | `/products/{id}` | Update product    |
+| DELETE | `/products/{id}` | Delete product    |
 
 ### Customers
-| Method | Endpoint             | Description          |
-|--------|----------------------|----------------------|
-| POST   | `/customers`         | Create customer      |
-| GET    | `/customers`         | List all customers   |
-| GET    | `/customers/{id}`    | Get customer by ID   |
-| DELETE | `/customers/{id}`    | Delete customer      |
+
+| Method | Endpoint          | Description        |
+| ------ | ----------------- | ------------------ |
+| POST   | `/customers`      | Create customer    |
+| GET    | `/customers`      | List all customers |
+| GET    | `/customers/{id}` | Get customer by ID |
+| DELETE | `/customers/{id}` | Delete customer    |
 
 ### Orders
-| Method | Endpoint         | Description                    |
-|--------|------------------|--------------------------------|
-| POST   | `/orders`        | Create order (deducts stock)   |
-| GET    | `/orders`        | List all orders                |
-| GET    | `/orders/{id}`   | Get order details              |
-| DELETE | `/orders/{id}`   | Cancel order (restores stock)  |
+
+| Method | Endpoint       | Description                   |
+| ------ | -------------- | ----------------------------- |
+| POST   | `/orders`      | Create order (deducts stock)  |
+| GET    | `/orders`      | List all orders               |
+| GET    | `/orders/{id}` | Get order details             |
+| DELETE | `/orders/{id}` | Cancel order (restores stock) |
 
 ### Dashboard
-| Method | Endpoint              | Description              |
-|--------|-----------------------|--------------------------|
-| GET    | `/dashboard/summary`  | Stats + low-stock list   |
+
+| Method | Endpoint             | Description            |
+| ------ | -------------------- | ---------------------- |
+| GET    | `/dashboard/summary` | Stats + low-stock list |
 
 ### Health
-| Method | Endpoint  | Description     |
-|--------|-----------|-----------------|
-| GET    | `/health` | Health check    |
+
+| Method | Endpoint  | Description  |
+| ------ | --------- | ------------ |
+| GET    | `/health` | Health check |
 
 ## Business Rules
 
@@ -107,15 +112,15 @@ docker compose exec backend python -m app.seed
 
 ## Environment Variables
 
-| Variable              | Description                              | Default (local)                                      |
-|-----------------------|------------------------------------------|------------------------------------------------------|
-| `POSTGRES_USER`       | Database username                        | `inventory_user`                                     |
-| `POSTGRES_PASSWORD`   | Database password                        | `inventory_pass`                                     |
-| `POSTGRES_DB`         | Database name                            | `inventory_db`                                       |
-| `DATABASE_URL`        | SQLAlchemy connection string             | `postgresql://inventory_user:inventory_pass@db:5432/inventory_db` |
-| `FRONTEND_ORIGIN`     | Allowed CORS origin(s), comma-separated  | `http://localhost:3000`                              |
-| `REACT_APP_API_URL`   | Backend URL for React frontend           | `http://localhost:8000`                              |
-| `LOW_STOCK_THRESHOLD` | Stock level for low-stock alerts         | `10`                                                 |
+| Variable              | Description                             | Default (local)                                                   |
+| --------------------- | --------------------------------------- | ----------------------------------------------------------------- |
+| `POSTGRES_USER`       | Database username                       | `inventory_user`                                                  |
+| `POSTGRES_PASSWORD`   | Database password                       | `inventory_pass`                                                  |
+| `POSTGRES_DB`         | Database name                           | `inventory_db`                                                    |
+| `DATABASE_URL`        | SQLAlchemy connection string            | `postgresql://inventory_user:inventory_pass@db:5432/inventory_db` |
+| `FRONTEND_ORIGIN`     | Allowed CORS origin(s), comma-separated | `http://localhost:3000`                                           |
+| `REACT_APP_API_URL`   | Backend URL for React frontend          | `http://localhost:8000`                                           |
+| `LOW_STOCK_THRESHOLD` | Stock level for low-stock alerts        | `5`                                                               |
 
 ---
 
@@ -159,11 +164,11 @@ docker push YOUR_DOCKERHUB_USERNAME/inventory-oms-backend:latest
      - Health Check Path: `/health`
 4. Set environment variables on the web service:
 
-   | Key                 | Value                                      |
-   |---------------------|--------------------------------------------|
-   | `DATABASE_URL`      | Render Postgres connection string          |
-   | `FRONTEND_ORIGIN`   | Your Vercel URL (set after Step 4)         |
-   | `LOW_STOCK_THRESHOLD` | `10`                                     |
+   | Key                   | Value                              |
+   | --------------------- | ---------------------------------- |
+   | `DATABASE_URL`        | Render Postgres connection string  |
+   | `FRONTEND_ORIGIN`     | Your Vercel URL (set after Step 4) |
+   | `LOW_STOCK_THRESHOLD` | `5`                                |
 
 5. Deploy and note your backend URL, e.g. `https://inventory-oms-backend.onrender.com`.
 
@@ -182,9 +187,9 @@ docker push YOUR_DOCKERHUB_USERNAME/inventory-oms-backend:latest
    - **Output Directory:** `build`
 4. Add environment variable:
 
-   | Key                   | Value                              |
-   |-----------------------|------------------------------------|
-   | `REACT_APP_API_URL`   | `https://your-backend.onrender.com`|
+   | Key                 | Value                               |
+   | ------------------- | ----------------------------------- |
+   | `REACT_APP_API_URL` | `https://your-backend.onrender.com` |
 
 5. Deploy and note your frontend URL, e.g. `https://inventory-oms.vercel.app`.
 
