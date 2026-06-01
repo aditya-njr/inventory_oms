@@ -1,9 +1,10 @@
 services:
   - type: web
     name: inventory-oms-backend
-    runtime: image
     plan: free
-    dockerImage: adityanjr/inventory-oms-backend:latest
+    runtime: image
+    image:
+      url: docker.io/adityanjr/inventory-oms-backend:latest
     healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
