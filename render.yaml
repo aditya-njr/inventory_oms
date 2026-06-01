@@ -3,7 +3,7 @@ services:
     name: inventory-oms-backend
     runtime: docker
     plan: free
-    dockerImage: YOUR_DOCKERHUB_USERNAME/inventory-oms-backend:latest
+    dockerImage: adityanjr/inventory-oms-backend:latest
     healthCheckPath: /health
     envVars:
       - key: DATABASE_URL

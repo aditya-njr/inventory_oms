@@ -9,7 +9,7 @@ from app.schemas import DashboardSummary, LowStockProduct
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
-LOW_STOCK_THRESHOLD = int(os.getenv("LOW_STOCK_THRESHOLD", "10"))
+LOW_STOCK_THRESHOLD = int(os.getenv("LOW_STOCK_THRESHOLD", "5"))
 
 
 @router.get("/summary", response_model=DashboardSummary)
