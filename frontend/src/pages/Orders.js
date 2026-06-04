@@ -5,7 +5,7 @@ import FormField from "../components/FormField";
 import Modal from "../components/Modal";
 import { useToast } from "../components/Toast";
 import { formatINR } from "../utils/currency";
-import { formatDate, formatDateTime } from "../utils/date";
+import { formatDateTime } from "../utils/date";
 
 const emptyLineItem = { product_id: "", quantity: "1" };
 
